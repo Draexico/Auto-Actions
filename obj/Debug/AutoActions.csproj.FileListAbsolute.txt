@@ -1,0 +1,14 @@
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\AutoActions.deps.json
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\AutoActions.dll
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\AutoActions.pdb
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\Newtonsoft.Json.dll
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\System.Windows.Extensions.dll
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\bin\Debug\runtimes\win\lib\net8.0\System.Windows.Extensions.dll
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.csproj.AssemblyReference.cache
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.AssemblyInfoInputs.cache
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.AssemblyInfo.cs
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.csproj.CoreCompileInputs.cache
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActi.806231DD.Up2Date
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.dll
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.pdb

@@ -1,0 +1,22 @@
+{
+  "Author": "Draexico",
+  "Name": "Base Plugin",
+  "Punchline": "Enable Auto Actions for various content.",
+  "Description": "",
+  "ApplicableVersion": "any",
+  "IsHide": "False",
+  "InternalName": "Auto Actions",
+  "AssemblyVersion": "1.0.0.0",
+  "TestingAssemblyVersion": "1.0.0.0",
+  "IsTestingExclusive": "False",
+  "DalamudApiLevel": 10,
+  "DownloadCount": 0,
+  "Tags": [
+    "Auto Actions",
+    "plugin"
+  ],
+  "LastUpdate": 0,
+  "RepoUrl": "https://github.com/Draexico/LimitBreaker",
+  "DownloadLinkInstall": "https://github.com/Draexico/LimitBreaker/releases/download/1.3.0.0/LimitBreaker.zip",
+  "DownloadLinkUpdate": "https://github.com/Draexico/LimitBreaker/releases/download/1.3.0.0/LimitBreaker.zip"
+}

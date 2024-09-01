@@ -1,0 +1,29 @@
+{
+    "PCT": {
+        "jobActions" : [34689, 34690, 34691]
+    },
+    "DNC" : {
+        "jobActions" : [16006]
+    },
+    "WAR": {
+        "jobActions" : [48]
+    },
+    "GNB": {
+        "jobActions" : [16142]
+    },
+    "DRK": {
+        "jobActions" : [3629]
+    },
+    "PLD": {
+        "jobActions" : [28]
+    },
+    "SCH": {
+        "jobActions" : [17215]
+    },
+    "SMN": {
+        "jobActions" : [25798]
+    },
+    "SGE": {
+        "jobActions" : [24285]
+    }
+}

@@ -1,0 +1,20 @@
+{
+  "Author": "Draexico",
+  "Name": "Base Plugin",
+  "InternalName": "AutoActions",
+  "AssemblyVersion": "1.0.0.0",
+  "Description": "",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/Draexico/LimitBreaker",
+  "Tags": [
+    "Limit Break",
+    "plugin"
+  ],
+  "DalamudApiLevel": 10,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "Punchline": "Enable Auto Actions for various content.",
+  "AcceptsFeedback": true
+}
