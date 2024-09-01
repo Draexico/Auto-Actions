@@ -103,7 +103,7 @@ namespace AutoActions {
                             ChatGui.Print("Failed to deserialize JSON.");
                         }
                     } else {
-                        ChatGui.Print("JSON file not found.");
+                        ChatGui.Print("JSON file not found");
                     }
                     if (File.Exists(activeJobActions)) {
                         string jsonString = File.ReadAllText(activeJobActions);

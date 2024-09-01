@@ -12,3 +12,4 @@ C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActio
 C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActi.806231DD.Up2Date
 C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.dll
 C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.pdb
+C:\Users\kosta\OneDrive\Documents\DalamudPlugins\AutoActions\obj\Debug\AutoActions.sourcelink.json
