@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using System.Numerics;
+using FFXIVClientStructs.FFXIV.Common.Component.Excel;
+using Dalamud.Game.ClientState.Resolvers;
 
 namespace AutoActions {
     public sealed class Plugin : IDalamudPlugin {
@@ -34,11 +36,12 @@ namespace AutoActions {
         private bool mainWindowVisible = false;
         public Configurations Configuration { get; init; }
         private float recastTime = 0;
-        private bool isStanceOn = true;
+        private bool isStanceOn = false;
         private bool isDPS = false;
         private bool isHealer = false;
         private bool isInView = false;
         private bool dutyWiped = false;
+        private string jobAbr = "";
         private Dictionary<string, JobActions> jobActionsDict = new Dictionary<string, JobActions>();
         private Dictionary<string, ActiveJobActions> activeJobActionsDict = new Dictionary<string, ActiveJobActions>();
 
@@ -54,11 +57,14 @@ namespace AutoActions {
             PluginInterface.UiBuilder.Draw += DrawUI;
             PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
             ReadJsonFile();
+            GetCurrentJob();
             if (Configuration.StopProgram) {
                 ClientState.TerritoryChanged += OnTerritoryChanged;
+                ClientState.ClassJobChanged += OnClassJobChanged;
             } else {
                 Framework.Update -= OnFrameUpdate;
                 ClientState.TerritoryChanged -= OnTerritoryChanged;
+                ClientState.ClassJobChanged -= OnClassJobChanged;
             }
 
         }
@@ -103,7 +109,7 @@ namespace AutoActions {
                             ChatGui.Print("Failed to deserialize JSON.");
                         }
                     } else {
-                        ChatGui.Print("JSON file not found");
+                        ChatGui.Print("JSON file not found.");
                     }
                     if (File.Exists(activeJobActions)) {
                         string jsonString = File.ReadAllText(activeJobActions);
@@ -127,6 +133,35 @@ namespace AutoActions {
         }
         public class ActiveJobActions {
             public int activeJobActions { get; set; }
+        }
+        private void GetCurrentJob() {
+            var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
+            if (localPlayerCharacterObject != null) {
+                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
+                if (jobSheet != null) {
+                    var classJob = localPlayerCharacterObject.ClassJob;
+                    var jobId = classJob.Id;
+                    var jobRow = jobSheet.GetRow(jobId);
+                    if (jobRow != null) {
+                        jobAbr = jobRow.Abbreviation;
+                        var role = Roles.GetRole(jobAbr);
+                        if (IsChecked(jobAbr)) {
+                            if (role == "Tank") {
+                                CheckTankStance(jobAbr);
+                            } else if (role == "Healer") {
+                                CheckHealer(jobAbr);
+                            } else if (role == "DPS") {
+                                isDPS = true;
+                            } else {
+                                isDPS = false;
+                                isHealer = false;
+                            }
+                        }
+                    }
+                } else {
+                    ChatGui.Print("Job Sheet not found.");
+                }
+            }
         }
 
         private void OnTerritoryChanged(ushort newTerritoryType) {
@@ -178,9 +213,36 @@ namespace AutoActions {
                     return false;
             }
         }
+        private void OnClassJobChanged(uint classJobId) {
+            // Check if checkbox is checked for the job
+            var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
+            if (localPlayerCharacterObject != null) {
+                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
+                if (jobSheet != null) {
+                    var jobRow = jobSheet.GetRow(classJobId);
+                    if (jobRow != null) {
+                        jobAbr = jobRow.Abbreviation;
+                        var role = Roles.GetRole(jobAbr);
+                        if (IsChecked(jobAbr)) {
+                            if (role == "Tank") {
+                                CheckTankStance(jobAbr);
+                            } else if (role == "Healer") {
+                                CheckHealer(jobAbr);
+                            } else if (role == "DPS") {
+                                isDPS = true;
+                            } else {
+                                isDPS = false;
+                                isHealer = false;
+                            }
+                        }
+                    }
+                } else {
+                    ChatGui.Print("Job Sheet not found.");
+                }
+            }
+        }
 
         private void OnFrameUpdate(IFramework framework) {
-            var jobAbr = "";
             var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
             var localPlayerGameObject = ClientState.LocalPlayer as IGameObject;
 
@@ -206,32 +268,6 @@ namespace AutoActions {
                 }
             }*/
             
-            // Check if checkbox is checked for the job
-            if (localPlayerCharacterObject != null) {
-                var jobId = localPlayerCharacterObject.ClassJob.Id;
-                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
-                if (jobSheet != null) {
-                    var jobRow = jobSheet.GetRow(jobId);
-                    if (jobRow != null) {
-                        jobAbr = jobRow.Abbreviation;
-                        var role = Roles.GetRole(jobAbr);
-                        if (IsChecked(jobAbr)) {
-                            if (role == "Tank") {
-                                CheckTankStance(jobAbr);
-                            } else if (role == "Healer") {
-                                CheckHealer(jobAbr);
-                            } else if (role == "DPS") {
-                                isDPS = true;
-                            } else {
-                                isDPS = false;
-                                isHealer = false;
-                            }
-                        }
-                    }
-                } else {
-                    ChatGui.Print("Job Sheet not found.");
-                }
-            }
             // While loading into duty, check until stance becomes available
             if (!isStanceOn) {
                 if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
@@ -332,15 +368,18 @@ namespace AutoActions {
                 
             }
         }
-        private async void UseActions(string jobAbr) {
+        private readonly object useActionsLock = new object();
+
+        private void UseActions(string jobAbr) {
             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
-                    unsafe {
-                        ActionManager* actions = ActionManager.Instance();
-                        actions->UseAction(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i], 0xE0000000uL);
-                        recastTime = actions->GetRecastTime(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                    lock (useActionsLock) {
+                        unsafe {
+                            ActionManager* actions = ActionManager.Instance();
+                            actions->UseAction(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i], 0xE0000000uL);
+                            recastTime = actions->GetRecastTime(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                        }
                     }
-                    await Task.Delay((int)(recastTime * 1000));
                 }
                 Framework.Update -= OnFrameUpdate;
             }
@@ -376,24 +415,31 @@ namespace AutoActions {
                     Configuration.Save();
                     if (Configuration.StopProgram) {
                         ChatGui.Print("Plugin Enabled");
-                        Framework.Update += OnFrameUpdate;
                     } else {
                         ChatGui.Print("Plugin Disabled");
-                        Framework.Update -= OnFrameUpdate;
                     }
                 }
 
                 ImGui.Separator();
 
+                if (ImGui.CollapsingHeader("Instance Type")) {
+                    bool dungeonChecked = Configuration.DungeonChecked;
+                    bool trialChecked = Configuration.TrialChecked;
+                    bool raidChecked = Configuration.RaidChecked;
+                    bool allianceChecked = Configuration.AllianceChecked;
+                    if (ImGui.Checkbox("Dungeon", ref dungeonChecked)) Configuration.DungeonChecked = dungeonChecked;
+                    if (ImGui.Checkbox("Trial", ref trialChecked)) Configuration.TrialChecked = trialChecked;
+                    if (ImGui.Checkbox("Raid", ref raidChecked)) Configuration.RaidChecked = raidChecked;
+                    if (ImGui.Checkbox("Alliance", ref allianceChecked)) Configuration.AllianceChecked = allianceChecked;
+                    Configuration.Save();
+                }
+
+                ImGui.Separator();
                 if (ImGui.CollapsingHeader("Tank Stance")) {
                     bool pldChecked = Configuration.PLDChecked;
                     bool warChecked = Configuration.WARChecked;
                     bool drkChecked = Configuration.DRKChecked;
                     bool gnbChecked = Configuration.GNBChecked;
-                    bool dungeonChecked = Configuration.DungeonChecked;
-                    bool trialChecked = Configuration.TrialChecked;
-                    bool raidChecked = Configuration.RaidChecked;
-                    bool allianceChecked = Configuration.AllianceChecked;
 
                     if (ImGui.Checkbox("Warrior", ref warChecked)) Configuration.WARChecked = warChecked;
                     if (ImGui.Checkbox("Gunbreaker", ref gnbChecked)) Configuration.GNBChecked = gnbChecked;
@@ -401,12 +447,6 @@ namespace AutoActions {
                     if (ImGui.Checkbox("Paladin", ref pldChecked)) Configuration.PLDChecked = pldChecked;
 
                     ImGui.Separator();
-
-                    if (ImGui.Checkbox("Dungeon", ref dungeonChecked)) Configuration.DungeonChecked = dungeonChecked;
-                    if (ImGui.Checkbox("Trial", ref trialChecked)) Configuration.TrialChecked = trialChecked;
-                    if (ImGui.Checkbox("Raid", ref raidChecked)) Configuration.RaidChecked = raidChecked;
-                    if (ImGui.Checkbox("Alliance", ref allianceChecked)) Configuration.AllianceChecked = allianceChecked;
-
                     Configuration.Save();
                 }
 
