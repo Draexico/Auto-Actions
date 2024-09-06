@@ -127,43 +127,44 @@ namespace AutoActions {
                 ChatGui.Print($"Error reading JSON file: {ex.Message}");
             }
         }
-
         public class JobActions {
             public List<int> jobActions { get; set; } = new List<int>();
         }
         public class ActiveJobActions {
             public int activeJobActions { get; set; }
         }
-        private void GetCurrentJob() {
-            var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
-            if (localPlayerCharacterObject != null) {
-                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
-                if (jobSheet != null) {
-                    var classJob = localPlayerCharacterObject.ClassJob;
-                    var jobId = classJob.Id;
-                    var jobRow = jobSheet.GetRow(jobId);
-                    if (jobRow != null) {
-                        jobAbr = jobRow.Abbreviation;
-                        var role = Roles.GetRole(jobAbr);
-                        ChatGui.Print($"Player is a {role}");
-                        if (IsChecked(jobAbr)) {
-                            if (role == "Tank") {
-                                CheckTankStance(jobAbr);
-                            } else if (role == "Healer") {
-                                CheckHealer(jobAbr);
-                            } else if (role == "DPS") {
-                                isDPS = true;
-                            } else {
-                                isDPS = false;
-                                isHealer = false;
-                            }
+        private async void GetCurrentJob() {
+        await Task.Delay(50);  // Short delay before checking the new job
+        var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
+        if (localPlayerCharacterObject != null) {
+            var jobSheet = DataManager.GetExcelSheet<ClassJob>();
+            if (jobSheet != null) {
+                var classJob = localPlayerCharacterObject.ClassJob;
+                var jobId = classJob.Id;
+                var jobRow = jobSheet.GetRow(jobId);
+                if (jobRow != null) {
+                    jobAbr = jobRow.Abbreviation;
+                    var role = Roles.GetRole(jobAbr);
+                    ChatGui.Print($"Player is a {jobAbr}");
+                    if (IsChecked(jobAbr)) {
+                        if (role == "Tank") {
+                            CheckTankStance(jobAbr);
+                        } else if (role == "Healer") {
+                            CheckHealer(jobAbr);
+                        } else if (role == "DPS") {
+                            isDPS = true;
+                        } else {
+                            isDPS = false;
+                            isHealer = false;
                         }
                     }
-                } else {
-                    ChatGui.Print("Job Sheet not found.");
                 }
+            } else {
+                ChatGui.Print("Job Sheet not found.");
             }
         }
+    }
+
 
         private void OnTerritoryChanged(ushort newTerritoryType) {
             if (IsInDuty(newTerritoryType, out string dutyType)) {
@@ -177,6 +178,7 @@ namespace AutoActions {
                         DutyState.DutyStarted += OnDutyRecommenced;
                 }
             } else {
+                isStanceOn = false;
                 Framework.Update -= OnFrameUpdate;
                 DutyState.DutyWiped -= OnDutyWiped;
                 DutyState.DutyStarted -= OnDutyRecommenced;
@@ -288,13 +290,11 @@ namespace AutoActions {
         }
 
         private void OnDutyWiped(object? sender, ushort args) {
-            isDPS = true;
             isInView = false;
             dutyWiped = true;
             Framework.Update += OnFrameUpdate;
         }
         private void OnDutyRecommenced(object? sender, ushort args) {
-            isDPS = true;
             isInView = false;
             Framework.Update -= OnFrameUpdate;
         }
