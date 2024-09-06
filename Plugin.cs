@@ -145,6 +145,7 @@ namespace AutoActions {
                     if (jobRow != null) {
                         jobAbr = jobRow.Abbreviation;
                         var role = Roles.GetRole(jobAbr);
+                        ChatGui.Print($"Player is a {role}");
                         if (IsChecked(jobAbr)) {
                             if (role == "Tank") {
                                 CheckTankStance(jobAbr);
@@ -214,40 +215,15 @@ namespace AutoActions {
             }
         }
         private void OnClassJobChanged(uint classJobId) {
-            // Check if checkbox is checked for the job
-            var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
-            if (localPlayerCharacterObject != null) {
-                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
-                if (jobSheet != null) {
-                    var jobRow = jobSheet.GetRow(classJobId);
-                    if (jobRow != null) {
-                        jobAbr = jobRow.Abbreviation;
-                        var role = Roles.GetRole(jobAbr);
-                        if (IsChecked(jobAbr)) {
-                            if (role == "Tank") {
-                                CheckTankStance(jobAbr);
-                            } else if (role == "Healer") {
-                                CheckHealer(jobAbr);
-                            } else if (role == "DPS") {
-                                isDPS = true;
-                            } else {
-                                isDPS = false;
-                                isHealer = false;
-                            }
-                        }
-                    }
-                } else {
-                    ChatGui.Print("Job Sheet not found.");
-                }
-            }
+            GetCurrentJob();
         }
 
         private void OnFrameUpdate(IFramework framework) {
             var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
             var localPlayerGameObject = ClientState.LocalPlayer as IGameObject;
 
-            var length = PartyList.Length;
-            /*if (length > 0 && localPlayerGameObject != null) {
+            /*var length = PartyList.Length;
+            if (length > 0 && localPlayerGameObject != null) {
                 Dictionary<string, string> partyMembersJobs = new();
                 for (int i = 0; i < length; i++) {
                     var partyMember = PartyList[i];
@@ -268,21 +244,6 @@ namespace AutoActions {
                 }
             }*/
             
-            // While loading into duty, check until stance becomes available
-            if (!isStanceOn) {
-                if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
-                    for (int i = 0; i < jobActionList.jobActions.Count; i++) {
-                        unsafe {
-                            ActionManager* actions = ActionManager.Instance();
-                            var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
-                            if (act == 0) {
-                                isStanceOn = true;
-                                UseActions(jobAbr);
-                            }
-                        }
-                    }
-                }
-            }
             // While loading into duty, check until skills becomes available
             if (localPlayerGameObject != null) {
                 unsafe {
@@ -298,6 +259,21 @@ namespace AutoActions {
                                         var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
                                         if (act == 572 || act == 0) {
                                             isDPS = false;
+                                            UseActions(jobAbr);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // While loading into duty, check until stance becomes available
+                        if (!isStanceOn && isInView) {
+                            if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
+                                for (int i = 0; i < jobActionList.jobActions.Count; i++) {
+                                    unsafe {
+                                        ActionManager* actions = ActionManager.Instance();
+                                        var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                                        if (act == 0) {
+                                            isStanceOn = true;
                                             UseActions(jobAbr);
                                         }
                                     }
@@ -357,7 +333,7 @@ namespace AutoActions {
                         return;
                     }
                 }
-                isStanceOn = false;
+                
             }
         }
         public void CheckHealer(string jobAbr) {
@@ -368,17 +344,13 @@ namespace AutoActions {
                 
             }
         }
-        private readonly object useActionsLock = new object();
-
         private void UseActions(string jobAbr) {
             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
-                    lock (useActionsLock) {
-                        unsafe {
-                            ActionManager* actions = ActionManager.Instance();
-                            actions->UseAction(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i], 0xE0000000uL);
-                            recastTime = actions->GetRecastTime(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
-                        }
+                    unsafe {
+                        ActionManager* actions = ActionManager.Instance();
+                        actions->UseAction(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i], 0xE0000000uL);
+                        recastTime = actions->GetRecastTime(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
                     }
                 }
                 Framework.Update -= OnFrameUpdate;
