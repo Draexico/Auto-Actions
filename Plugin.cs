@@ -134,45 +134,40 @@ namespace AutoActions {
             public int activeJobActions { get; set; }
         }
         private async void GetCurrentJob() {
-        await Task.Delay(50);  // Short delay before checking the new job
-        var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
-        if (localPlayerCharacterObject != null) {
-            var jobSheet = DataManager.GetExcelSheet<ClassJob>();
-            if (jobSheet != null) {
-                var classJob = localPlayerCharacterObject.ClassJob;
-                var jobId = classJob.Id;
-                var jobRow = jobSheet.GetRow(jobId);
-                if (jobRow != null) {
-                    jobAbr = jobRow.Abbreviation;
-                    var role = Roles.GetRole(jobAbr);
-                    ChatGui.Print($"Player is a {jobAbr}");
-                    if (IsChecked(jobAbr)) {
-                        if (role == "Tank") {
-                            CheckTankStance(jobAbr);
-                        } else if (role == "Healer") {
-                            CheckHealer(jobAbr);
-                        } else if (role == "DPS") {
-                            isDPS = true;
-                        } else {
-                            isDPS = false;
-                            isHealer = false;
+            await Task.Delay(50);  // Short delay before checking the new job
+            var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
+            if (localPlayerCharacterObject != null) {
+                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
+                if (jobSheet != null) {
+                    var classJob = localPlayerCharacterObject.ClassJob;
+                    var jobId = classJob.Id;
+                    var jobRow = jobSheet.GetRow(jobId);
+                    if (jobRow != null) {
+                        jobAbr = jobRow.Abbreviation;
+                        var role = Roles.GetRole(jobAbr);
+                        if (IsChecked(jobAbr)) {
+                            if (role == "Tank") {
+                                CheckTankStance(jobAbr);
+                            } else if (role == "Healer") {
+                                CheckHealer(jobAbr);
+                            } else if (role == "DPS") {
+                                isDPS = true;
+                            }
                         }
                     }
+                } else {
+                    ChatGui.Print("Job Sheet not found.");
                 }
-            } else {
-                ChatGui.Print("Job Sheet not found.");
             }
         }
-    }
-
 
         private void OnTerritoryChanged(ushort newTerritoryType) {
             if (IsInDuty(newTerritoryType, out string dutyType)) {
                 // Check the duty type and corresponding configuration before subscribing to the event
-                if ((dutyType == "Dungeon" && Configuration.DungeonChecked) ||
-                    (dutyType == "Trial" && Configuration.TrialChecked) ||
-                    (dutyType == "Raid" && Configuration.RaidChecked) ||
-                    (dutyType == "Alliance Raid" && Configuration.AllianceChecked)) {
+                if ((dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
+                    (dutyType == "Trial" && Configuration.TankTrialChecked) ||
+                    (dutyType == "Raid" && Configuration.TankRaidChecked) ||
+                    (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked)) {
                         Framework.Update += OnFrameUpdate;
                         DutyState.DutyWiped += OnDutyWiped;
                         DutyState.DutyStarted += OnDutyRecommenced;
@@ -393,32 +388,26 @@ namespace AutoActions {
                 }
 
                 ImGui.Separator();
-
-                if (ImGui.CollapsingHeader("Instance Type")) {
-                    bool dungeonChecked = Configuration.DungeonChecked;
-                    bool trialChecked = Configuration.TrialChecked;
-                    bool raidChecked = Configuration.RaidChecked;
-                    bool allianceChecked = Configuration.AllianceChecked;
-                    if (ImGui.Checkbox("Dungeon", ref dungeonChecked)) Configuration.DungeonChecked = dungeonChecked;
-                    if (ImGui.Checkbox("Trial", ref trialChecked)) Configuration.TrialChecked = trialChecked;
-                    if (ImGui.Checkbox("Raid", ref raidChecked)) Configuration.RaidChecked = raidChecked;
-                    if (ImGui.Checkbox("Alliance", ref allianceChecked)) Configuration.AllianceChecked = allianceChecked;
-                    Configuration.Save();
-                }
-
-                ImGui.Separator();
                 if (ImGui.CollapsingHeader("Tank Stance")) {
                     bool pldChecked = Configuration.PLDChecked;
                     bool warChecked = Configuration.WARChecked;
                     bool drkChecked = Configuration.DRKChecked;
                     bool gnbChecked = Configuration.GNBChecked;
-
                     if (ImGui.Checkbox("Warrior", ref warChecked)) Configuration.WARChecked = warChecked;
                     if (ImGui.Checkbox("Gunbreaker", ref gnbChecked)) Configuration.GNBChecked = gnbChecked;
                     if (ImGui.Checkbox("Dark Knight", ref drkChecked)) Configuration.DRKChecked = drkChecked;
                     if (ImGui.Checkbox("Paladin", ref pldChecked)) Configuration.PLDChecked = pldChecked;
 
                     ImGui.Separator();
+                    bool tankDungeonChecked = Configuration.TankDungeonChecked;
+                    bool tankTrialChecked = Configuration.TankTrialChecked;
+                    bool tankRaidChecked = Configuration.TankRaidChecked;
+                    bool tankAllianceChecked = Configuration.TankAllianceChecked;
+                    if (ImGui.Checkbox("Dungeon", ref tankDungeonChecked)) Configuration.TankDungeonChecked = tankDungeonChecked;
+                    if (ImGui.Checkbox("Trial", ref tankTrialChecked)) Configuration.TankTrialChecked = tankTrialChecked;
+                    if (ImGui.Checkbox("Raid", ref tankRaidChecked)) Configuration.TankRaidChecked = tankRaidChecked;
+                    if (ImGui.Checkbox("Alliance", ref tankAllianceChecked)) Configuration.TankAllianceChecked = tankAllianceChecked;
+
                     Configuration.Save();
                 }
 
@@ -433,6 +422,17 @@ namespace AutoActions {
 
                     Configuration.SCHChecked = schChecked;
                     Configuration.SGEChecked = sgeChecked;
+
+                    ImGui.Separator();
+                    bool healerDungeonChecked = Configuration.HealerDungeonChecked;
+                    bool healerTrialChecked = Configuration.HealerTrialChecked;
+                    bool healerRaidChecked = Configuration.HealerRaidChecked;
+                    bool healerAllianceChecked = Configuration.HealerAllianceChecked;
+                    if (ImGui.Checkbox("Dungeon", ref healerDungeonChecked)) Configuration.HealerDungeonChecked = healerDungeonChecked;
+                    if (ImGui.Checkbox("Trial", ref healerTrialChecked)) Configuration.HealerTrialChecked = healerTrialChecked;
+                    if (ImGui.Checkbox("Raid", ref healerRaidChecked)) Configuration.HealerRaidChecked = healerRaidChecked;
+                    if (ImGui.Checkbox("Alliance", ref healerAllianceChecked)) Configuration.HealerAllianceChecked = healerAllianceChecked;
+
                     Configuration.Save();
                 }
 
