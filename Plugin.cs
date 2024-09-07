@@ -59,6 +59,7 @@ namespace AutoActions {
             ReadJsonFile();
             GetCurrentJob();
             if (Configuration.StopProgram) {
+                CheckIfInDuty();
                 ClientState.TerritoryChanged += OnTerritoryChanged;
                 ClientState.ClassJobChanged += OnClassJobChanged;
             } else {
@@ -81,11 +82,16 @@ namespace AutoActions {
             Configuration.StopProgram = !Configuration.StopProgram;
             if (Configuration.StopProgram) {
                 ChatGui.Print("Auto Actions Enabled");
+                CheckIfInDuty();
                 ClientState.TerritoryChanged += OnTerritoryChanged;
+                ClientState.ClassJobChanged += OnClassJobChanged;
             } else {
                 ChatGui.Print("Auto Actions Disabled");
                 Framework.Update -= OnFrameUpdate;
                 ClientState.TerritoryChanged -= OnTerritoryChanged;
+                ClientState.ClassJobChanged -= OnClassJobChanged;
+                DutyState.DutyWiped -= OnDutyWiped;
+                DutyState.DutyStarted -= OnDutyRecommenced;
             }
             Configuration.Save();
         }
@@ -133,6 +139,59 @@ namespace AutoActions {
         public class ActiveJobActions {
             public int activeJobActions { get; set; }
         }
+        private void CheckIfInDuty() {
+            bool hasDutyStarted = DutyState.IsDutyStarted;
+            if (hasDutyStarted) {
+                GetCurrentJob();
+                var territoryType = ClientState.TerritoryType;
+                if (IsInDuty(territoryType)) {
+                    // Get the player's role (Tank, Healer, DPS)
+                    var role = Roles.GetRole(jobAbr);
+
+                    // Variable to check if we should subscribe to the duty events
+                    bool shouldSubscribe = false;
+
+                    switch (role) {
+                        case "Tank":
+                            shouldSubscribe = (dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
+                                            (dutyType == "Trial" && Configuration.TankTrialChecked) ||
+                                            (dutyType == "Raid" && Configuration.TankRaidChecked) ||
+                                            (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked);
+                            break;
+
+                        case "Healer":
+                            shouldSubscribe = (dutyType == "Dungeon" && Configuration.HealerDungeonChecked) ||
+                                            (dutyType == "Trial" && Configuration.HealerTrialChecked) ||
+                                            (dutyType == "Raid" && Configuration.HealerRaidChecked) ||
+                                            (dutyType == "Alliance Raid" && Configuration.HealerAllianceChecked);
+                            break;
+
+                        case "DPS":
+                            shouldSubscribe = (dutyType == "Dungeon" && Configuration.DPSDungeonChecked) ||
+                                            (dutyType == "Trial" && Configuration.DPSTrialChecked) ||
+                                            (dutyType == "Raid" && Configuration.DPSRaidChecked) ||
+                                            (dutyType == "Alliance Raid" && Configuration.DPSAllianceChecked);
+                            break;
+
+                        default:
+                            ChatGui.Print("Unknown role");
+                            break;
+                    }
+
+                    if (shouldSubscribe) {
+                        // Subscribe to duty events if the conditions match
+                        DutyState.DutyWiped += OnDutyWiped;
+                        DutyState.DutyStarted += OnDutyRecommenced;
+                    }
+                } else {
+                    // Reset if not in duty
+                    isStanceOn = false;
+                    DutyState.DutyWiped -= OnDutyWiped;
+                    DutyState.DutyStarted -= OnDutyRecommenced;
+                }
+            }
+        }
+
         private async void GetCurrentJob() {
             await Task.Delay(50);  // Short delay before checking the new job
             var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
@@ -161,24 +220,54 @@ namespace AutoActions {
             }
         }
 
-        private void OnTerritoryChanged(ushort newTerritoryType) {
-            if (IsInDuty(newTerritoryType)) {
-                // Check the duty type and corresponding configuration before subscribing to the event
-                if ((dutyType == "Dungeon" && Configuration.TankDungeonChecked ) ||
-                    (dutyType == "Trial" && Configuration.TankTrialChecked) ||
-                    (dutyType == "Raid" && Configuration.TankRaidChecked) ||
-                    (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked)) {
-                        Framework.Update += OnFrameUpdate;
-                        DutyState.DutyWiped += OnDutyWiped;
-                        DutyState.DutyStarted += OnDutyRecommenced;
-                }
-            } else {
-                isStanceOn = false;
-                Framework.Update -= OnFrameUpdate;
-                DutyState.DutyWiped -= OnDutyWiped;
-                DutyState.DutyStarted -= OnDutyRecommenced;
+    private void OnTerritoryChanged(ushort newTerritoryType) {
+        if (IsInDuty(newTerritoryType)) {
+            // Get the player's role (Tank, Healer, DPS)
+            var role = Roles.GetRole(jobAbr);
+
+            // Check if the player's specific role is enabled for the current duty type
+            bool shouldUpdate = false;
+
+            switch (role) {
+                case "Tank":
+                    shouldUpdate = (dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
+                                (dutyType == "Trial" && Configuration.TankTrialChecked) ||
+                                (dutyType == "Raid" && Configuration.TankRaidChecked) ||
+                                (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked);
+                    break;
+
+                case "Healer":
+                    shouldUpdate = (dutyType == "Dungeon" && Configuration.HealerDungeonChecked) ||
+                                (dutyType == "Trial" && Configuration.HealerTrialChecked) ||
+                                (dutyType == "Raid" && Configuration.HealerRaidChecked) ||
+                                (dutyType == "Alliance Raid" && Configuration.HealerAllianceChecked);
+                    break;
+
+                case "DPS":
+                    shouldUpdate = (dutyType == "Dungeon" && Configuration.DPSDungeonChecked) ||
+                                (dutyType == "Trial" && Configuration.DPSTrialChecked) ||
+                                (dutyType == "Raid" && Configuration.DPSRaidChecked) ||
+                                (dutyType == "Alliance Raid" && Configuration.DPSAllianceChecked);
+                    break;
+
+                default:
+                    ChatGui.Print("Unknown role");
+                    break;
             }
+
+            if (shouldUpdate) {
+                Framework.Update += OnFrameUpdate;
+                DutyState.DutyWiped += OnDutyWiped;
+                DutyState.DutyStarted += OnDutyRecommenced;
+            }
+        } else {
+            isStanceOn = false;
+            Framework.Update -= OnFrameUpdate;
+            DutyState.DutyWiped -= OnDutyWiped;
+            DutyState.DutyStarted -= OnDutyRecommenced;
         }
+    }
+
 
         // Check if player moved to a duty instance
         private bool IsInDuty(ushort territory) {
