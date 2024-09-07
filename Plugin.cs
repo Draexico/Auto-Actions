@@ -40,8 +40,8 @@ namespace AutoActions {
         private bool isDPS = false;
         private bool isHealer = false;
         private bool isInView = false;
-        private bool dutyWiped = false;
         private string jobAbr = "";
+        private string dutyType = "";
         private Dictionary<string, JobActions> jobActionsDict = new Dictionary<string, JobActions>();
         private Dictionary<string, ActiveJobActions> activeJobActionsDict = new Dictionary<string, ActiveJobActions>();
 
@@ -149,7 +149,7 @@ namespace AutoActions {
                             if (role == "Tank") {
                                 CheckTankStance(jobAbr);
                             } else if (role == "Healer") {
-                                CheckHealer(jobAbr);
+                                isHealer = true;
                             } else if (role == "DPS") {
                                 isDPS = true;
                             }
@@ -162,9 +162,9 @@ namespace AutoActions {
         }
 
         private void OnTerritoryChanged(ushort newTerritoryType) {
-            if (IsInDuty(newTerritoryType, out string dutyType)) {
+            if (IsInDuty(newTerritoryType)) {
                 // Check the duty type and corresponding configuration before subscribing to the event
-                if ((dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
+                if ((dutyType == "Dungeon" && Configuration.TankDungeonChecked ) ||
                     (dutyType == "Trial" && Configuration.TankTrialChecked) ||
                     (dutyType == "Raid" && Configuration.TankRaidChecked) ||
                     (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked)) {
@@ -181,8 +181,7 @@ namespace AutoActions {
         }
 
         // Check if player moved to a duty instance
-        private static bool IsInDuty(ushort territory, out string dutyType) {
-            dutyType = "";
+        private bool IsInDuty(ushort territory) {
 
             var territoryType = DataManager.GetExcelSheet<TerritoryType>()?.GetRow(territory);
             if (territoryType == null)
@@ -263,7 +262,7 @@ namespace AutoActions {
                             }
                         }
                         // While loading into duty, check until stance becomes available
-                        if (!isStanceOn && isInView) {
+                        else if (!isStanceOn && isInView) {
                             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                                     unsafe {
@@ -272,6 +271,25 @@ namespace AutoActions {
                                         if (act == 0) {
                                             isStanceOn = true;
                                             UseActions(jobAbr);
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (isHealer && isInView) {
+                            if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
+                                if (jobAbr == "SGE" && (dutyType == "Dungeon" || dutyType == "Alliance Raid")) {
+                                    for (int i = 0; i < jobActionList.jobActions.Count; i++) {
+                                        // TODO: Select tank
+                                    }
+                                } else if (jobAbr == "SCH") {
+                                    for (int i = 0; i < jobActionList.jobActions.Count; i++) {
+                                        unsafe {
+                                            ActionManager* actions = ActionManager.Instance();
+                                            var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                                            if (act == 0) {
+                                                isHealer = false;
+                                                UseActions(jobAbr);
+                                            }
                                         }
                                     }
                                 }
@@ -286,7 +304,6 @@ namespace AutoActions {
 
         private void OnDutyWiped(object? sender, ushort args) {
             isInView = false;
-            dutyWiped = true;
             Framework.Update += OnFrameUpdate;
         }
         private void OnDutyRecommenced(object? sender, ushort args) {
@@ -331,15 +348,7 @@ namespace AutoActions {
                 
             }
         }
-        public void CheckHealer(string jobAbr) {
-            if (jobAbr == "SCH") {
-                isHealer = true;
-                UseActions(jobAbr);
-            } else {
-                
-            }
-        }
-        private void UseActions(string jobAbr) {
+        private async void UseActions(string jobAbr) {
             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                     unsafe {
@@ -347,8 +356,14 @@ namespace AutoActions {
                         actions->UseAction(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i], 0xE0000000uL);
                         recastTime = actions->GetRecastTime(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
                     }
+                    await Task.Delay((int)(recastTime * 1000));
                 }
                 Framework.Update -= OnFrameUpdate;
+                if (!isHealer) {
+                    isHealer = true;
+                } else if (!isDPS) {
+                    isDPS = true;
+                }
             }
         }
         public void TargetPartyMember(uint partyMemberObjectId) {
@@ -381,9 +396,9 @@ namespace AutoActions {
                     Configuration.StopProgram = stopProgram;
                     Configuration.Save();
                     if (Configuration.StopProgram) {
-                        ChatGui.Print("Plugin Enabled");
+                        ChatGui.Print("Auto Actions Enabled");
                     } else {
-                        ChatGui.Print("Plugin Disabled");
+                        ChatGui.Print("Auto Actions Disabled");
                     }
                 }
 
@@ -403,22 +418,21 @@ namespace AutoActions {
                     bool tankTrialChecked = Configuration.TankTrialChecked;
                     bool tankRaidChecked = Configuration.TankRaidChecked;
                     bool tankAllianceChecked = Configuration.TankAllianceChecked;
-                    if (ImGui.Checkbox("Dungeon", ref tankDungeonChecked)) Configuration.TankDungeonChecked = tankDungeonChecked;
-                    if (ImGui.Checkbox("Trial", ref tankTrialChecked)) Configuration.TankTrialChecked = tankTrialChecked;
-                    if (ImGui.Checkbox("Raid", ref tankRaidChecked)) Configuration.TankRaidChecked = tankRaidChecked;
-                    if (ImGui.Checkbox("Alliance", ref tankAllianceChecked)) Configuration.TankAllianceChecked = tankAllianceChecked;
+                    if (ImGui.Checkbox("Tank Dungeon", ref tankDungeonChecked)) Configuration.TankDungeonChecked = tankDungeonChecked;
+                    if (ImGui.Checkbox("Tank Trial", ref tankTrialChecked)) Configuration.TankTrialChecked = tankTrialChecked;
+                    if (ImGui.Checkbox("Tank Raid", ref tankRaidChecked)) Configuration.TankRaidChecked = tankRaidChecked;
+                    if (ImGui.Checkbox("Tank Alliance", ref tankAllianceChecked)) Configuration.TankAllianceChecked = tankAllianceChecked;
 
                     Configuration.Save();
                 }
 
                 ImGui.Separator();
-
                 if (ImGui.CollapsingHeader("Healers")) {
                     bool schChecked = Configuration.SCHChecked;
                     bool sgeChecked = Configuration.SGEChecked;
 
                     DrawDPSCheckbox("Scholar", ref schChecked, "Automatically pop fairy on duty start");
-                    DrawDPSCheckbox("Sage", ref sgeChecked, "Partners whichever tank has stance on");
+                    DrawDPSCheckbox("Sage", ref sgeChecked, "Automatically uses kardia on the tank (dungeon and alliance only)");
 
                     Configuration.SCHChecked = schChecked;
                     Configuration.SGEChecked = sgeChecked;
@@ -428,28 +442,37 @@ namespace AutoActions {
                     bool healerTrialChecked = Configuration.HealerTrialChecked;
                     bool healerRaidChecked = Configuration.HealerRaidChecked;
                     bool healerAllianceChecked = Configuration.HealerAllianceChecked;
-                    if (ImGui.Checkbox("Dungeon", ref healerDungeonChecked)) Configuration.HealerDungeonChecked = healerDungeonChecked;
-                    if (ImGui.Checkbox("Trial", ref healerTrialChecked)) Configuration.HealerTrialChecked = healerTrialChecked;
-                    if (ImGui.Checkbox("Raid", ref healerRaidChecked)) Configuration.HealerRaidChecked = healerRaidChecked;
-                    if (ImGui.Checkbox("Alliance", ref healerAllianceChecked)) Configuration.HealerAllianceChecked = healerAllianceChecked;
+                    if (ImGui.Checkbox("Healer Dungeon", ref healerDungeonChecked)) Configuration.HealerDungeonChecked = healerDungeonChecked;
+                    if (ImGui.Checkbox("Healer Trial", ref healerTrialChecked)) Configuration.HealerTrialChecked = healerTrialChecked;
+                    if (ImGui.Checkbox("Healer Raid", ref healerRaidChecked)) Configuration.HealerRaidChecked = healerRaidChecked;
+                    if (ImGui.Checkbox("Healer Alliance", ref healerAllianceChecked)) Configuration.HealerAllianceChecked = healerAllianceChecked;
 
                     Configuration.Save();
                 }
 
                 ImGui.Separator();
-
                 if (ImGui.CollapsingHeader("DPS")) {
                     bool pctChecked = Configuration.PCTChecked;
                     bool smnChecked = Configuration.SMNChecked;
                     bool dncChecked = Configuration.DNCChecked;
 
-                    DrawDPSCheckbox("Pictomancer", ref pctChecked, "Automatically pop motifs on duty start");
-                    DrawDPSCheckbox("Summoner", ref smnChecked, "Automatically pop carbuncle on duty start");
-                    DrawDPSCheckbox("Dancer", ref dncChecked, "Dance partner the only DPS in party, or follow DNC priority");
+                    DrawDPSCheckbox("Pictomancer", ref pctChecked, "Automatically pop motifs on duty start & wipe");
+                    DrawDPSCheckbox("Summoner", ref smnChecked, "Automatically pop carbuncle on duty start & wipe");
+                    DrawDPSCheckbox("Dancer", ref dncChecked, "Dance partner the DPS following the Dancer Priority List");
 
                     Configuration.PCTChecked = pctChecked;
                     Configuration.SMNChecked = smnChecked;
                     Configuration.DNCChecked = dncChecked;
+                    ImGui.Separator();
+                    bool dpsDungeonChecked = Configuration.DPSDungeonChecked;
+                    bool dpsTrialChecked = Configuration.DPSTrialChecked;
+                    bool dpsRaidChecked = Configuration.DPSRaidChecked;
+                    bool dpsAllianceChecked = Configuration.DPSAllianceChecked;
+                    if (ImGui.Checkbox("DPS Dungeon", ref dpsDungeonChecked)) Configuration.DPSDungeonChecked = dpsDungeonChecked;
+                    if (ImGui.Checkbox("DPS Trial", ref dpsTrialChecked)) Configuration.DPSTrialChecked = dpsTrialChecked;
+                    if (ImGui.Checkbox("DPS Raid", ref dpsRaidChecked)) Configuration.DPSRaidChecked = dpsRaidChecked;
+                    if (ImGui.Checkbox("DPS Alliance", ref dpsAllianceChecked)) Configuration.DPSAllianceChecked = dpsAllianceChecked;
+
                     Configuration.Save();
                 }
 
@@ -459,12 +482,14 @@ namespace AutoActions {
                     if (ImGui.Button("Reset Priority List")) {
                         ResetPriorityList();
                     }
-                    for (int i = 0; i < Configuration.DncPrio.Count; i++) {
+                    int maxPrioCount = 13;  // Limit the list
+
+                    for (int i = 0; i < Configuration.DncPrio.Count && i < maxPrioCount; i++) {
                         ImGui.PushID(i);
                         string currentPos = (i + 1).ToString();
                         ImGui.SetNextItemWidth(80);
                         if (ImGui.BeginCombo($"##{Configuration.DncPrio[i]}", currentPos)) {
-                            for (int j = 1; j <= Configuration.DncPrio.Count; j++) {
+                            for (int j = 1; j <= maxPrioCount; j++) {  // Limit to 13 items.
                                 if (ImGui.Selectable(j.ToString())) {
                                     int newIndex = j - 1;
                                     if (newIndex != i) {
@@ -482,16 +507,16 @@ namespace AutoActions {
                     }
                     Configuration.Save();
                 }
-
+                
                 ImGui.End();
             }
         }
 
         private void DrawDPSCheckbox(string label, ref bool isChecked, string description) {
             ImGui.Checkbox(label, ref isChecked);
-            ImGui.Indent(20); // Tab once
+            ImGui.Indent(20); 
             ImGui.TextDisabled(description);
-            ImGui.Unindent(20); // Remove indentation
+            ImGui.Unindent(20);
         }
 
         private void ResetPriorityList() {
