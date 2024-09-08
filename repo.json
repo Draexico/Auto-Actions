@@ -7,8 +7,8 @@
     "ApplicableVersion": "any",
     "IsHide": "False",
     "InternalName": "AutoActions",
-    "AssemblyVersion": "1.1.0.0",
-    "TestingAssemblyVersion": "1.1.0.0",
+    "AssemblyVersion": "1.1.1.0",
+    "TestingAssemblyVersion": "1.1.1.0",
     "IsTestingExclusive": "False",
     "DalamudApiLevel": 10,
     "DownloadCount": 0,
@@ -18,7 +18,7 @@
     ],
     "LastUpdate": 0,
     "RepoUrl": "https://github.com/Draexico/Auto-Actions",
-    "DownloadLinkInstall": "https://github.com/Draexico/Auto-Actions/releases/download/1.1.0.0/AutoActions.zip",
-    "DownloadLinkUpdate": "https://github.com/Draexico/Auto-Actions/releases/download/1.1.0.0/AutoActions.zip"
+    "DownloadLinkInstall": "https://github.com/Draexico/Auto-Actions/releases/download/1.1.1.0/AutoActions.zip",
+    "DownloadLinkUpdate": "https://github.com/Draexico/Auto-Actions/releases/download/1.1.1.0/AutoActions.zip"
     }
 ]
