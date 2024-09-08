@@ -1,9 +1,9 @@
 {
   "Author": "Draexico",
-  "Name": "Base Plugin",
-  "InternalName": "AutoActions",
+  "Name": "Auto Actions",
+  "InternalName": "Auto Actions",
   "AssemblyVersion": "1.0.0.0",
-  "Description": "",
+  "Description": "Automatically pop tank stance and other pre-battle skills for various content.",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/Draexico/LimitBreaker",
   "Tags": [
