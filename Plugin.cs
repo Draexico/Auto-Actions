@@ -16,6 +16,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Common.Component.Excel;
 using Dalamud.Game.ClientState.Resolvers;
+using Dalamud.Game.ClientState.Conditions;
 
 namespace AutoActions {
     public sealed class Plugin : IDalamudPlugin {
@@ -27,7 +28,7 @@ namespace AutoActions {
         [PluginService] internal static IKeyState KeyState { get; private set; } = null!;
         [PluginService] internal static IClientState ClientState { get; private set; } = null!;
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
-        [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
+        [PluginService] internal static ICondition Condition { get; private set; } = null!;
         [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
         [PluginService] internal static IDutyState DutyState { get; private set; } = null!;
 
@@ -57,15 +58,16 @@ namespace AutoActions {
             PluginInterface.UiBuilder.Draw += DrawUI;
             PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
             ReadJsonFile();
-            GetCurrentJob();
             if (Configuration.StopProgram) {
                 CheckIfInDuty();
                 ClientState.TerritoryChanged += OnTerritoryChanged;
                 ClientState.ClassJobChanged += OnClassJobChanged;
+                Condition.ConditionChange += OnConditionChange;
             } else {
                 Framework.Update -= OnFrameUpdate;
                 ClientState.TerritoryChanged -= OnTerritoryChanged;
                 ClientState.ClassJobChanged -= OnClassJobChanged;
+                Condition.ConditionChange -= OnConditionChange;
             }
 
         }
@@ -76,6 +78,7 @@ namespace AutoActions {
             ClientState.TerritoryChanged -= OnTerritoryChanged;
             PluginInterface.UiBuilder.Draw -= DrawUI;
             PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+            Condition.ConditionChange -= OnConditionChange;
         }
 
         private void OnCommand(string command, string args) {
@@ -85,6 +88,7 @@ namespace AutoActions {
                 CheckIfInDuty();
                 ClientState.TerritoryChanged += OnTerritoryChanged;
                 ClientState.ClassJobChanged += OnClassJobChanged;
+                Condition.ConditionChange += OnConditionChange;
             } else {
                 ChatGui.Print("Auto Actions Disabled");
                 Framework.Update -= OnFrameUpdate;
@@ -92,6 +96,7 @@ namespace AutoActions {
                 ClientState.ClassJobChanged -= OnClassJobChanged;
                 DutyState.DutyWiped -= OnDutyWiped;
                 DutyState.DutyStarted -= OnDutyRecommenced;
+                Condition.ConditionChange -= OnConditionChange;
             }
             Configuration.Save();
         }
@@ -142,12 +147,11 @@ namespace AutoActions {
         private void CheckIfInDuty() {
             bool hasDutyStarted = DutyState.IsDutyStarted;
             if (hasDutyStarted) {
-                GetCurrentJob();
+                GetCurrentJob(hasDutyStarted);
                 var territoryType = ClientState.TerritoryType;
                 if (IsInDuty(territoryType)) {
                     // Get the player's role (Tank, Healer, DPS)
                     var role = Roles.GetRole(jobAbr);
-
                     // Variable to check if we should subscribe to the duty events
                     bool shouldSubscribe = false;
 
@@ -192,8 +196,10 @@ namespace AutoActions {
             }
         }
 
-        private async void GetCurrentJob() {
-            await Task.Delay(50);  // Short delay before checking the new job
+        private async void GetCurrentJob(bool hasDutyStarted) {
+            if (!hasDutyStarted) {
+                await Task.Delay(100);  // Short delay before checking the new job
+            }
             var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
             if (localPlayerCharacterObject != null) {
                 var jobSheet = DataManager.GetExcelSheet<ClassJob>();
@@ -220,53 +226,54 @@ namespace AutoActions {
             }
         }
 
-    private void OnTerritoryChanged(ushort newTerritoryType) {
-        if (IsInDuty(newTerritoryType)) {
-            // Get the player's role (Tank, Healer, DPS)
-            var role = Roles.GetRole(jobAbr);
+        private void OnTerritoryChanged(ushort newTerritoryType) {
+            GetCurrentJob(false);
+            if (IsInDuty(newTerritoryType)) {
+                // Get the player's role (Tank, Healer, DPS)
+                var role = Roles.GetRole(jobAbr);
 
-            // Check if the player's specific role is enabled for the current duty type
-            bool shouldUpdate = false;
+                // Check if the player's specific role is enabled for the current duty type
+                bool shouldUpdate = false;
 
-            switch (role) {
-                case "Tank":
-                    shouldUpdate = (dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
-                                (dutyType == "Trial" && Configuration.TankTrialChecked) ||
-                                (dutyType == "Raid" && Configuration.TankRaidChecked) ||
-                                (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked);
-                    break;
+                switch (role) {
+                    case "Tank":
+                        shouldUpdate = (dutyType == "Dungeon" && Configuration.TankDungeonChecked) ||
+                                    (dutyType == "Trial" && Configuration.TankTrialChecked) ||
+                                    (dutyType == "Raid" && Configuration.TankRaidChecked) ||
+                                    (dutyType == "Alliance Raid" && Configuration.TankAllianceChecked);
+                        break;
 
-                case "Healer":
-                    shouldUpdate = (dutyType == "Dungeon" && Configuration.HealerDungeonChecked) ||
-                                (dutyType == "Trial" && Configuration.HealerTrialChecked) ||
-                                (dutyType == "Raid" && Configuration.HealerRaidChecked) ||
-                                (dutyType == "Alliance Raid" && Configuration.HealerAllianceChecked);
-                    break;
+                    case "Healer":
+                        shouldUpdate = (dutyType == "Dungeon" && Configuration.HealerDungeonChecked) ||
+                                    (dutyType == "Trial" && Configuration.HealerTrialChecked) ||
+                                    (dutyType == "Raid" && Configuration.HealerRaidChecked) ||
+                                    (dutyType == "Alliance Raid" && Configuration.HealerAllianceChecked);
+                        break;
 
-                case "DPS":
-                    shouldUpdate = (dutyType == "Dungeon" && Configuration.DPSDungeonChecked) ||
-                                (dutyType == "Trial" && Configuration.DPSTrialChecked) ||
-                                (dutyType == "Raid" && Configuration.DPSRaidChecked) ||
-                                (dutyType == "Alliance Raid" && Configuration.DPSAllianceChecked);
-                    break;
+                    case "DPS":
+                        shouldUpdate = (dutyType == "Dungeon" && Configuration.DPSDungeonChecked) ||
+                                    (dutyType == "Trial" && Configuration.DPSTrialChecked) ||
+                                    (dutyType == "Raid" && Configuration.DPSRaidChecked) ||
+                                    (dutyType == "Alliance Raid" && Configuration.DPSAllianceChecked);
+                        break;
 
-                default:
-                    ChatGui.Print("Unknown role");
-                    break;
+                    default:
+                        ChatGui.Print("Unknown role");
+                        break;
+                }
+
+                if (shouldUpdate) {
+                    Framework.Update += OnFrameUpdate;
+                    DutyState.DutyWiped += OnDutyWiped;
+                    DutyState.DutyStarted += OnDutyRecommenced;
+                }
+            } else {
+                isStanceOn = false;
+                Framework.Update -= OnFrameUpdate;
+                DutyState.DutyWiped -= OnDutyWiped;
+                DutyState.DutyStarted -= OnDutyRecommenced;
             }
-
-            if (shouldUpdate) {
-                Framework.Update += OnFrameUpdate;
-                DutyState.DutyWiped += OnDutyWiped;
-                DutyState.DutyStarted += OnDutyRecommenced;
-            }
-        } else {
-            isStanceOn = false;
-            Framework.Update -= OnFrameUpdate;
-            DutyState.DutyWiped -= OnDutyWiped;
-            DutyState.DutyStarted -= OnDutyRecommenced;
         }
-    }
 
 
         // Check if player moved to a duty instance
@@ -300,7 +307,13 @@ namespace AutoActions {
             }
         }
         private void OnClassJobChanged(uint classJobId) {
-            GetCurrentJob();
+            GetCurrentJob(false);
+        }
+        private void OnConditionChange(ConditionFlag conditionFlag, bool value) {
+            if (conditionFlag.ToString() == "WaitingForDutyFinder") {
+                GetCurrentJob(false);
+                Condition.ConditionChange -= OnConditionChange;
+            }
         }
 
         private void OnFrameUpdate(IFramework framework) {
@@ -448,9 +461,10 @@ namespace AutoActions {
                     await Task.Delay((int)(recastTime * 1000));
                 }
                 Framework.Update -= OnFrameUpdate;
-                if (!isHealer) {
+                var role = Roles.GetRole(jobAbr);
+                if (role == "Healer" && !isHealer) {
                     isHealer = true;
-                } else if (!isDPS) {
+                } else if (role == "DPS" && !isDPS) {
                     isDPS = true;
                 }
             }
