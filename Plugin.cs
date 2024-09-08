@@ -363,7 +363,6 @@ namespace AutoActions {
                                 }
                             }
                         }
-                        // While loading into duty, check until stance becomes available
                         else if (!isStanceOn && isInView) {
                             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
