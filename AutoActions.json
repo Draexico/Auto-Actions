@@ -1,8 +1,8 @@
 {
   "Author": "Draexico",
-  "Name": "Base Plugin",
+  "Name": "Auto Actions",
   "Punchline": "Enable Auto Actions for various content.",
-  "Description": "",
+  "Description": "Automatically pop tank stance on duty start and other pre-battle stuff.",
   "ApplicableVersion": "any",
   "IsHide": "False",
   "InternalName": "Auto Actions",
