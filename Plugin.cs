@@ -350,7 +350,6 @@ namespace AutoActions {
                         TargetSystem* targetSystem = TargetSystem.Instance();
                         isInView = targetSystem->IsObjectOnScreen(playerObject);
                         if (isDPS && isInView) {
-                            ChatGui.Print("DPS Trig");
                             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                                     unsafe {
@@ -365,7 +364,6 @@ namespace AutoActions {
                             }
                         }
                         else if (!isStanceOn && isInView && Roles.GetRole(jobAbr) == "Tank") {
-                            ChatGui.Print("Tank Trig");
                             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                 for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                                     unsafe {
@@ -381,12 +379,10 @@ namespace AutoActions {
                         } else if (isHealer && isInView) {
                             if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                 if (jobAbr == "SGE" && (dutyType == "Dungeon" || dutyType == "Alliance Raid")) {
-                                    ChatGui.Print("SGE trig");
                                     isHealer = false;
                                     Framework.Update -= OnFrameUpdate;
                                     // TODO: Select tank
                                 } else if (jobAbr == "SCH") {
-                                    ChatGui.Print("SCH trig");
                                     for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                                         unsafe {
                                             ActionManager* actions = ActionManager.Instance();
