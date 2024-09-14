@@ -48,6 +48,12 @@ namespace AutoActions {
 
         public Plugin() {
             Configuration = PluginInterface.GetPluginConfig() as Configurations ?? new Configurations();
+            if (Configuration.DncPrio == null || Configuration.DncPrio.Count == 0) {
+                Configuration.DncPrio = new List<string> {
+                    "SAM", "PCT", "VPR", "NIN", "MNK", "RPR", "BLM", "DRG", "SMN", "RDM", "MCH", "BRD", "DNC"
+                };
+                Configuration.Save();
+            }
 
             CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand) {
                 HelpMessage = "Enable Auto Actions"
@@ -596,8 +602,11 @@ namespace AutoActions {
                                     int newIndex = j - 1;
                                     if (newIndex != i) {
                                         var item = Configuration.DncPrio[i];
-                                        Configuration.DncPrio.RemoveAt(i);
-                                        Configuration.DncPrio.Insert(newIndex, item);
+                                        var newList = new List<string>(Configuration.DncPrio);
+                                        newList.RemoveAt(i);
+                                        newList.Insert(newIndex, item);
+                                        Configuration.DncPrio = newList;
+                                        Configuration.Save();
                                     }
                                 }
                             }
@@ -607,7 +616,6 @@ namespace AutoActions {
                         ImGui.Text(Configuration.DncPrio[i]);
                         ImGui.PopID();
                     }
-                    Configuration.Save();
                 }
                 
                 ImGui.End();
