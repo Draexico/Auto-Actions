@@ -321,32 +321,42 @@ namespace AutoActions {
                 Condition.ConditionChange -= OnConditionChange;
             }
         }
+        private Dictionary<string, string> GetPartyMembers() {
+            var localPlayerGameObject = ClientState.LocalPlayer as IGameObject;
+            Dictionary<string, string> partyMembersJobs = new();
+            var length = PartyList.Length;
+
+            if (length > 0 && localPlayerGameObject != null) {
+                var jobSheet = DataManager.GetExcelSheet<ClassJob>();
+
+                if (jobSheet == null) {
+                    ChatGui.Print("Job Sheet not found.");
+                    return partyMembersJobs; // Return empty dictionary if job sheet is not found
+                }
+
+                for (int i = 0; i < length; i++) {
+                    var partyMember = PartyList[i];
+                    if (partyMember != null && partyMember.ObjectId != localPlayerGameObject.GameObjectId) {
+                        var classJob = partyMember.ClassJob;
+                        var jobId = classJob.Id;
+                        var jobRow = jobSheet.GetRow(jobId);
+
+                        if (jobRow != null) {
+                            var jobAbbreviation = jobRow.Abbreviation;
+                            partyMembersJobs[partyMember.Name.ToString()] = jobAbbreviation;
+                        }
+                    }
+                }
+            }
+
+            return partyMembersJobs; // Return the filled dictionary
+        }
+
+
 
         private void OnFrameUpdate(IFramework framework) {
             var localPlayerCharacterObject = ClientState.LocalPlayer as ICharacter;
             var localPlayerGameObject = ClientState.LocalPlayer as IGameObject;
-
-            /*var length = PartyList.Length;
-            if (length > 0 && localPlayerGameObject != null) {
-                Dictionary<string, string> partyMembersJobs = new();
-                for (int i = 0; i < length; i++) {
-                    var partyMember = PartyList[i];
-                    if (partyMember != null && partyMember.ObjectId != localPlayerGameObject.GameObjectId) {
-                        var jobId = partyMember.ClassJob.Id;
-                        var jobSheet = DataManager.GetExcelSheet<ClassJob>();
-                        if (jobSheet != null) {
-                            var jobRow = jobSheet.GetRow(jobId);
-                            uint partyMemberObjectId = partyMember.ObjectId;
-                            if (jobRow != null) {
-                                jobAbr = jobRow.Abbreviation;
-                                partyMembersJobs[partyMember.Name.ToString()] = jobAbr;
-                            }
-                        } else {
-                            ChatGui.Print("Job Sheet not found.");
-                        }
-                    }
-                }
-            }*/
             
             // While loading into duty, check until skills becomes available
             if (localPlayerGameObject != null) {
@@ -355,47 +365,71 @@ namespace AutoActions {
                     if (playerObject != null) {
                         TargetSystem* targetSystem = TargetSystem.Instance();
                         isInView = targetSystem->IsObjectOnScreen(playerObject);
-                        if (isDPS && isInView) {
-                            if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
-                                for (int i = 0; i < jobActionList.jobActions.Count; i++) {
-                                    unsafe {
-                                        ActionManager* actions = ActionManager.Instance();
-                                        var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
-                                        if (act == 572 || act == 0) {
-                                            isDPS = false;
-                                            UseActions(jobAbr);
+                        if (isInView) {
+                            var partyMembersJobs = GetPartyMembers();
+                            if (isDPS) {
+                                if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
+                                    for (int i = 0; i < jobActionList.jobActions.Count; i++) {
+                                        unsafe {
+                                            ActionManager* actions = ActionManager.Instance();
+                                            var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                                            if (act == 572 || act == 0) {
+                                                isDPS = false;
+                                                UseActions(jobAbr);
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        }
-                        else if (!isStanceOn && isInView && Roles.GetRole(jobAbr) == "Tank") {
-                            if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
-                                for (int i = 0; i < jobActionList.jobActions.Count; i++) {
-                                    unsafe {
-                                        ActionManager* actions = ActionManager.Instance();
-                                        var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
-                                        if (act == 0) {
-                                            isStanceOn = true;
-                                            UseActions(jobAbr);
-                                        }
-                                    }
-                                }
-                            }
-                        } else if (isHealer && isInView) {
-                            if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
-                                if (jobAbr == "SGE" && (dutyType == "Dungeon" || dutyType == "Alliance Raid")) {
-                                    isHealer = false;
-                                    Framework.Update -= OnFrameUpdate;
-                                    // TODO: Select tank
-                                } else if (jobAbr == "SCH") {
+                            } else if (!isStanceOn && Roles.GetRole(jobAbr) == "Tank") {
+                                if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
                                     for (int i = 0; i < jobActionList.jobActions.Count; i++) {
                                         unsafe {
                                             ActionManager* actions = ActionManager.Instance();
                                             var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
                                             if (act == 0) {
-                                                isHealer = false;
+                                                isStanceOn = true;
                                                 UseActions(jobAbr);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (isHealer) {
+                                if (jobActionsDict.TryGetValue(jobAbr, out var jobActionList)) {
+                                    if (jobAbr == "SGE" && (dutyType == "Dungeon" || dutyType == "Alliance Raid")) {
+                                        for (int i = 0; i < PartyList.Length; i++) {
+                                            var partyMember = PartyList[i];
+                                            if (partyMember != null) {
+                                                if (partyMembersJobs.TryGetValue(partyMember.Name.ToString(), out var memberJob)) {
+                                                    if (Roles.GetRole(memberJob) == "Tank") {
+                                                        var tankGameObject = partyMember.GameObject;
+                                                        if (tankGameObject != null) {
+                                                            unsafe {                                
+                                                                if (targetSystem != null) {
+                                                                    isInView = targetSystem->IsObjectOnScreen((GameObject*)tankGameObject.Address);
+                                                                    if (isInView) {
+                                                                        TargetPartyMember(partyMember.ObjectId);                                                                        
+                                                                        isHealer = false; 
+                                                                        Framework.Update -= OnFrameUpdate; // Stop checking
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    else if (jobAbr == "SCH") {
+                                        for (int i = 0; i < jobActionList.jobActions.Count; i++) {
+                                            unsafe {
+                                                ActionManager* actions = ActionManager.Instance();
+                                                var act = actions->GetActionStatus(FFXIVClientStructs.FFXIV.Client.Game.ActionType.Action, (uint)jobActionList.jobActions[i]);
+                                                if (act == 0) {
+                                                    isHealer = false;
+                                                    UseActions(jobAbr);
+                                                }
                                             }
                                         }
                                     }
@@ -476,24 +510,22 @@ namespace AutoActions {
         }
         public void TargetPartyMember(uint partyMemberObjectId) {
             unsafe {
-                TargetSystem* target = TargetSystem.Instance();
-                TargetPartyMember(partyMemberObjectId);
-                var member = ObjectTable.SearchById(partyMemberObjectId);
-                if (member != null) {
-                    unsafe {
-                        var targetSystem = TargetSystem.Instance();
-                        if (targetSystem != null) {
-                            targetSystem->Target = (GameObject*)member.Address;
-                            ChatGui.Print($"Targeted party member: {member.Name}");
-                        } else {
-                            ChatGui.Print("Could not retrieve TargetSystem instance.");
-                        }
+                var targetSystem = TargetSystem.Instance();
+                if (targetSystem != null) {
+                    // Directly target the member by ObjectId
+                    var partyMember = ObjectTable[(int)partyMemberObjectId]; 
+                    if (partyMember != null) {
+                        targetSystem->Target = (GameObject*)partyMember.Address;
+                        ChatGui.Print($"Targeted party member: {partyMember.Name}");
+                    } else {
+                        ChatGui.Print($"Could not find party member with ObjectId: {partyMemberObjectId}");
                     }
                 } else {
-                    ChatGui.Print($"Could not find party member with ObjectId: {partyMemberObjectId}");
+                    ChatGui.Print("Could not retrieve TargetSystem instance.");
                 }
             }
         }
+
         private void DrawUI() {
             if (mainWindowVisible) {
                 ImGui.SetNextWindowSize(new Vector2(500, 500), ImGuiCond.Once);
